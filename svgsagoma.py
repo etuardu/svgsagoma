@@ -1,62 +1,38 @@
 #!/usr/bin/env python3
 
-import tempfile
 import subprocess
 
-class TxtFields():
-    
-                
-    def _records_gen(self):
-        """Yield a dictionary {<field>: <value>, ...} for each line in the file"""
-        with open(self.filename) as infile:
-            if self.first_line_header:
-                infile.next()
-            for line in infile:
-                field_values = line.rstrip().split(self.separator)
-                yield dict(zip(self.field_names, field_values))
+default_placeholder = "txt%s"
+placeholder_format = "{%s}"
 
+class FileReader():    
 
-    def consumed(self):
-        """True if EOF, False otherwise"""
-        if self.current_record:
-            return False
-        else:
-            try:
-                self.current_record = next(self.records)
-            except StopIteration:
-                return True
-        return False
+    def __init__(self, f, separator=';', first_line_headers=False):
 
-    
-    def pop(self, key):
-        """Pop the current value for the field <key>"""
-        try:
-            if not self.current_record:
-                self.current_record = next(self.records)
-        except StopIteration:
-            return ""
-        return self.current_record.pop(key)
-    
-    
-    def __init__(self, filename, separator=';', first_line_header=False):
-        
-        self.filename = filename
-        self.separator = separator
-        self.first_line_header= first_line_header
-        
-        with open(filename) as infile:
-            fields = infile.readline().rstrip().split(separator)
-            
-        if first_line_header:
-            self.field_names = fields
-        else:
-            self.field_names = [ "txt%s" % (n+1) for n in range(len(fields)) ]
-
-        self.records = self._records_gen()
+        self.field_names = list()
+        self.records = list()
         self.current_record = None
+        
+        with open(f) as infile:
+            if first_line_headers:
+                line = infile.readline()
+                self.field_names = line.rstrip().split(separator)
+            for line in infile:
+                fields = line.rstrip().split(separator)
+                self.records.append(fields)
+                for n in range(len(self.field_names)+1, len(fields)+1):
+                    self.field_names.append(default_placeholder % n)
+
+    def pop(self, field_name):
+        if not self.current_record:
+            self.current_record = dict(zip(self.field_names, self.records.pop(0)))
+        return self.current_record.pop(field_name)
+
+    def is_empty(self):
+        return not self.records and not self.current_record
 
 
-class MyTemplate():
+class Sagoma():
 
     def _findall(self, txt, subtxt):
         """Yield each starting and ending position of
@@ -73,7 +49,7 @@ class MyTemplate():
 
         self.slices = list()
         for field in field_names:
-            placeholder = '{%s}' % field
+            placeholder = placeholder_format % field
             
             pos_tuples = list(self._findall(self.txt, placeholder))
             # positions of each occourrence of the placeholder,
@@ -93,49 +69,40 @@ class MyTemplate():
         self.slices.sort(key=lambda t: t[1][0])
         # sorted in order of appareance in the file
 
-
-    def next_slice(self):
-        i = None
+    def fill(self, f):
+        i = 0
         for (placeholder, pos) in self.slices:
-            yield (i, pos[0])
-            yield placeholder
+            yield self.txt[i:pos[0]]
+            try:
+                yield f(placeholder)
+            except IndexError:
+                # no records
+                yield ""
             i = pos[1]
-        yield (i, None)
+        yield self.txt[i:]
 
-    def fill(self, fields):
-        for t in self.next_slice():
-            if type(t) is tuple:
-                yield self.txt[t[0]:t[1]]
-            else:
-                yield fields.pop(t)
+def main():
+    f = FileReader("testo.txt")
+    s = Sagoma("prova.svg", f.field_names)
+    tempfile = "_temp.svg"
 
-
-
-csv = TxtFields("testo.txt")
-sagoma = MyTemplate("prova.svg", csv.field_names)
-tempfile = "_temp.svg"
-
-i=1
-while not csv.consumed():
+    i = 1
     
-    with open(tempfile, "w") as temp:
-    
-        for txt in sagoma.fill(csv):
-            temp.write(txt)
+    while not f.is_empty():
 
-    subprocess.check_output([
-        "inkscape",
-        "-z",
-        tempfile,
-        "-d",
-        "300",
-        "-A",
-        "out{}.pdf".format(str(i).zfill(3))
-    ])
+        with open(tempfile, "w") as temp:
+            for txt in s.fill(f.pop):
+                temp.write(txt)
+                
+        subprocess.check_output([
+            "inkscape",
+            "-z",
+            tempfile,
+            "-d",
+            "300",
+            "-A",
+            "out{}.pdf".format(str(i).zfill(3))
+        ])
 
-    i+=1 
-    
-
-
-
-
+        i+=1 
+            

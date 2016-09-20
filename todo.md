@@ -3,4 +3,4 @@ If some lines in the file contains more fields than those in TxtFields.field_val
 the further fields are not yielded at all in the dictionary.
 Fix it by providing the further fields using as keys the default
 "txtN", even if the object is constructed with the first_line_header set to True.
-
+* status: fixed
