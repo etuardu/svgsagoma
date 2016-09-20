@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import subprocess
+import argparse
+import os
 
 default_placeholder = "txt%s"
 placeholder_format = "{%s}"
@@ -81,28 +83,93 @@ class Sagoma():
             i = pos[1]
         yield self.txt[i:]
 
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Replace values and export images from an svg file")
+    parser.add_argument("csv_file", help="input text file in csv format")
+    parser.add_argument("svg_file", help="input svg file")
+    parser.add_argument("out_prefix", nargs="?", default="out", help="prefix for output file(s) (default: 'out')")
+    parser.add_argument("-d", type=int, default=300, help="set dpi quality (default: 300)")
+    parser.add_argument("-j", action="store_true", help="join output files as a multipage pdf")
+    parser.add_argument("--separator", default=';', help="separator character in the csv file (default: ';')")
+    parser.add_argument("--header", action="store_true", help="name the placeholders according to the first line of the csv file (default: 'txt1' ... 'txtN')")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-png", dest='format', action="store_const",
+                       const=dict(ext='png', flag='-e'),
+                       help="export as png")
+    group.add_argument("-pdf", dest='format', action="store_const",
+                       const=dict(ext='pdf', flag='-A'),
+                       help="export as pdf (default)")
+
+    return(parser.parse_args())
+
+
 def main():
-    f = FileReader("testo.txt")
-    s = Sagoma("prova.svg", f.field_names)
+
+    args = parse_arguments()
+
+    f = FileReader(
+        args.csv_file,
+        separator=args.separator,
+        first_line_headers=args.header
+    )
+    s = Sagoma(args.svg_file, f.field_names)
     tempfile = "_temp.svg"
+    out_list = list()
 
     i = 1
-    
     while not f.is_empty():
+
+        out_file = "{}{}.{}".format(
+            args.out_prefix,
+            str(i).zfill(3),
+            args.format['ext']
+        )
+        out_list.append(out_file)
 
         with open(tempfile, "w") as temp:
             for txt in s.fill(f.pop):
                 temp.write(txt)
-                
+
         subprocess.check_output([
             "inkscape",
-            "-z",
-            tempfile,
-            "-d",
-            "300",
-            "-A",
-            "out{}.pdf".format(str(i).zfill(3))
+            "-z", tempfile,
+            "-d", str(args.d),
+            args.format['flag'], out_file
         ])
 
-        i+=1 
-            
+        i+=1
+
+    os.remove(tempfile)
+
+    if args.j:
+        # join all generated files in a multipage
+        # pdf and delete them
+
+        command = {
+            'pdf': 'pdfunite',
+            'png': 'convert'
+        }[args.format['ext']]
+
+        out_file = "{}.pdf".format(
+            args.out_prefix,
+            args.format['ext']
+        )
+        
+        subprocess.check_output([
+            command,
+            *out_list,
+            out_file
+        ])
+
+        for f in out_list:
+            os.remove(f)
+    
+    return 0
+
+
+if __name__ == '__main__':
+    exit(main())
+
+
