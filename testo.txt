@@ -1,5 +1,0 @@
-uno;due;tre
-one;two;three
-jeden;dva;tri
-unu;doi;trete
-A;B;C
