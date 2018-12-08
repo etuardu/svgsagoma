@@ -101,6 +101,7 @@ def parse_arguments():
     group.add_argument("-pdf", dest='format', action="store_const",
                        const=dict(ext='pdf', flag='-A'),
                        help="export as pdf (default)")
+    parser.add_argument("--sed", metavar="COMMAND|#PRESET", help="pre-process the svg running the provided sed command or preset (#id_display, #onload_display)")
 
     return(parser.parse_args())
 
