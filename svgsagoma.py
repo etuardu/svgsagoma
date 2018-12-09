@@ -3,9 +3,15 @@
 import subprocess
 import argparse
 import os
+import tempfile
 
 default_placeholder = "txt%s"
 placeholder_format = "{%s}"
+
+sed_presets = {
+    "#id_display": r's/id=".*_disp:\(.*\)"/& style="display:{\1}"/g',
+    "#onload_display": r's/onload="disp:\(.*\)"/style="display:{\1}"/g'
+}
 
 class FileReader():    
 
@@ -44,10 +50,16 @@ class Sagoma():
             yield (pos, pos+len(subtxt))
             pos = txt.find(subtxt, pos+1)
 
-    def __init__(self, filename, field_names):
+    def __init__(self, in_file, field_names):
         
-        with open(filename) as infile:
-            self.txt = infile.read()
+        if hasattr(in_file, 'read'):
+            # file-like object
+            self.txt = in_file.read().decode('utf-8')
+            in_file.close()
+        else:
+            # filename
+            with open(in_file) as fp:
+                self.txt = fp.read()
 
         self.slices = list()
         for field in field_names:
@@ -101,7 +113,7 @@ def parse_arguments():
     group.add_argument("-pdf", dest='format', action="store_const",
                        const=dict(ext='pdf', flag='-A'),
                        help="export as pdf (default)")
-    parser.add_argument("--sed", metavar="COMMAND|#PRESET", help="pre-process the svg running the provided sed command or preset (#id_display, #onload_display)")
+    parser.add_argument("--sed", metavar="CMD|#PRESET", help="preprocess the svg running the provided sed command or preset (#id_display, #onload_display)")
 
     return(parser.parse_args())
 
@@ -110,13 +122,23 @@ def main():
 
     args = parse_arguments()
 
+    if args.sed:
+        # svg preprocessing
+        if args.sed in sed_presets:
+            args.sed = sed_presets[args.sed]
+        svg_in = tempfile.TemporaryFile()
+        subprocess.run(['sed', '--posix', args.sed, args.svg_file], stdout=svg_in)
+        svg_in.seek(0)
+    else:
+        svg_in = args.svg_file
+
     f = FileReader(
         args.csv_file,
         separator=args.separator,
         first_line_headers=args.header
     )
-    s = Sagoma(args.svg_file, f.field_names)
-    tempfile = "_temp.svg"
+    s = Sagoma(svg_in, f.field_names)
+    tmpfile = "_temp.svg"
     out_list = list()
 
     i = 1
@@ -129,20 +151,20 @@ def main():
         )
         out_list.append(out_file)
 
-        with open(tempfile, "w") as temp:
+        with open(tmpfile, "w") as temp:
             for txt in s.fill(f.pop):
                 temp.write(txt)
 
         subprocess.check_output([
             "inkscape",
-            "-z", tempfile,
+            "-z", tmpfile,
             "-d", str(args.d),
             args.format['flag'], out_file
         ])
 
         i+=1
 
-    os.remove(tempfile)
+    os.remove(tmpfile)
 
     if args.j:
         # join all generated files in a multipage
