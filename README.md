@@ -25,6 +25,8 @@ from a csv file and exporting in various formats.
                             the csv file (default: 'txt1' ... 'txtN')
       -png                  export as png
       -pdf                  export as pdf (default)
+      --sed CMD|#PRESET     preprocess the svg running the provided sed command or
+                            preset (#id_display, #onload_display)
 
 ## Examples
 
@@ -59,6 +61,79 @@ read field names from file
 > The `--header` parameter is used to read the field names from the first line of the
 > csv file and the placeholders in the svg are named accordingly.
 
+## Preprocessing of the svg with `--sed`
+
+The `--sed` argument can be used to perform some adjustments on the svg input.
+Under the hood, it will just execute the `sed` command for you, so doing this:
+
+    svgsagoma csv.txt img.svg --sed 's/#ff0000/#ffffff'
+
+will produce the same results as doing this:
+
+    sed 's/#ff0000/#ffffff' img.svg > img_white.svg
+    svgsagoma csv.txt img_white.svg
+
+This is mainly useful if you need to put placeholders in part of the svg where they
+would break the integrity of the source file.
+
+### Presets
+
+A command starting with `#` is considered to be one of the following presets, which are
+included in svgsagoma to integrate some features of wider use.
+
+#### `--sed '#id_display'`
+
+Useful if you need the ability to hide elements depening on csv data.
+Adds a placeholder to control the display styling of elements having id
+ending with `_disp:<placeholder>`.  
+This is a shorthand for `--sed 's/id=".*_disp:\(.*\)"/& style="display:{\1}"/g'`.  
+Example:
+
+svg input:
+
+    <text id="text4748_disp:nameDisplay"><tspan>{name}</tspan></text>
+    
+preprocessed svg:
+
+    <text id="text4748_disp:nameDisplay" style="display{nameDisplay}"><tspan>{name}</tspan></text>
+
+csv input:
+
+    nameDisplay;name
+    block;Charles
+    none;Mark
+    
+svg to be exported:
+
+    <text id="text4748_disp:nameDisplay" style="display:block"><tspan>Charles</tspan></text>
+    <text id="text4748_disp:nameDisplay" style="display:none"><tspan>Mark</tspan></text>
+
+#### `--sed '#onload_display'`
+
+Same goal of `--sed '#id_display'` but avoids the id pollution.
+The display placeholder is added to every element having `disp:<placeholder>` as value
+for the `onload` property. The onload property is cleared afterwards.  
+This is a shorthand for `--sed 's/onload="disp:\(.*\)"/style="display:{\1}"/g'`.  
+Example:
+
+svg input:
+    
+    <text onload="disp:nameDisplay"><tspan>{name}</tspan></text>
+    
+preprocessed svg:
+
+    <text style="display:{nameDisplay}"><tspan>{name}</tspan></text>
+
+csv input:
+
+    nameDisplay;name
+    block;Charles
+    none;Mark
+
+svg to be exported:
+
+    <text style="display:block"><tspan>Charles</tspan></text>
+    <text style="display:none"><tspan>Mark</tspan></text>
 
 ## Dependencies
 
@@ -67,3 +142,4 @@ read field names from file
 * inkscape
 * pdfunite
 * convert (imagemagick)
+* sed (for the `--sed` argument)
