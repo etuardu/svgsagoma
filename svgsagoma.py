@@ -181,6 +181,7 @@ def main():
                     temp.write(txt)
         except SvgsagomaMissingPlaceholders as e:
             print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
+            os.remove(tmpfile)
             for f in out_list[:-1]:
                 # remove already created output files
                 os.remove(f)
