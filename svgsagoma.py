@@ -4,6 +4,7 @@ import subprocess
 import argparse
 import os
 import tempfile
+import sys
 
 default_placeholder = "txt%s"
 placeholder_format = "{%s}"
@@ -12,6 +13,9 @@ sed_presets = {
     "#id_display": r's/id=".*_disp:\(.*\)"/& style="display:{\1}"/g',
     "#onload_display": r's/onload="disp:\(.*\)"/style="display:{\1}"/g'
 }
+
+class SvgsagomaMissingPlaceholders(Exception):
+    pass
 
 class FileReader():    
 
@@ -34,7 +38,15 @@ class FileReader():
     def pop(self, field_name):
         if not self.current_record:
             self.current_record = dict(zip(self.field_names, self.records.pop(0)))
-        return self.current_record.pop(field_name)
+        try:
+            return self.current_record.pop(field_name)
+        except KeyError:
+            # unconsumed records
+            raise SvgsagomaMissingPlaceholders(
+                "Missing placeholder for record(s): {}".format(
+                    ", ".join(self.current_record.keys())
+                )
+            )
 
     def is_empty(self):
         return not self.records and not self.current_record
@@ -142,6 +154,7 @@ def main():
     out_list = list()
 
     i = 1
+    exit_error = 0
     while not f.is_empty():
 
         out_file = "{}{}.{}".format(
@@ -151,9 +164,14 @@ def main():
         )
         out_list.append(out_file)
 
-        with open(tmpfile, "w") as temp:
-            for txt in s.fill(f.pop):
-                temp.write(txt)
+        try:
+            with open(tmpfile, "w") as temp:
+                for txt in s.fill(f.pop):
+                    temp.write(txt)
+        except SvgsagomaMissingPlaceholders as e:
+            print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
+            exit_error = 1
+            break
 
         subprocess.check_output([
             "inkscape",
@@ -165,6 +183,10 @@ def main():
         i+=1
 
     os.remove(tmpfile)
+
+    if exit_error > 0:
+        # TODO: remove created files
+        return exit_error
 
     if args.j:
         # join all generated files in a multipage
