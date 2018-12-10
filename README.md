@@ -95,7 +95,7 @@ svg input:
     
 preprocessed svg:
 
-    <text id="text4748_disp:nameDisplay" style="display{nameDisplay}"><tspan>{name}</tspan></text>
+    <text id="text4748_disp:nameDisplay" style="display:{nameDisplay}"><tspan>{name}</tspan></text>
 
 csv input:
 
@@ -103,7 +103,7 @@ csv input:
     block;Charles
     none;Mark
     
-svg to be exported:
+resulting svgs:
 
     <text id="text4748_disp:nameDisplay" style="display:block"><tspan>Charles</tspan></text>
     <text id="text4748_disp:nameDisplay" style="display:none"><tspan>Mark</tspan></text>
@@ -130,7 +130,7 @@ csv input:
     block;Charles
     none;Mark
 
-svg to be exported:
+resulting svgs:
 
     <text style="display:block"><tspan>Charles</tspan></text>
     <text style="display:none"><tspan>Mark</tspan></text>
