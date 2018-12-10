@@ -17,6 +17,9 @@ sed_presets = {
 class SvgsagomaMissingPlaceholders(Exception):
     pass
 
+class SvgsagomaInvalidRecordLength(Exception):
+    pass
+
 class FileReader():    
 
     def __init__(self, f, separator=';', first_line_headers=False):
@@ -24,16 +27,35 @@ class FileReader():
         self.field_names = list()
         self.records = list()
         self.current_record = None
-        
+
         with open(f) as infile:
+            firstrecord = infile.readline().rstrip().split(separator)
+            line_number = 2
+            record_length = len(firstrecord)
+
             if first_line_headers:
-                line = infile.readline()
-                self.field_names = line.rstrip().split(separator)
+                self.field_names = firstrecord
+            else:
+                self.field_names = [
+                    default_placeholder % n
+                    for n in range(1, record_length+1)
+                ]
+                infile.seek(0)
+                line_number = 1
+
             for line in infile:
                 fields = line.rstrip().split(separator)
+                if len(fields) != record_length:
+                    raise SvgsagomaInvalidRecordLength(
+                        "{} records read, {} expected ({}, line {})".format(
+                            len(fields),
+                            record_length,
+                            f,
+                            line_number
+                        )
+                    )
                 self.records.append(fields)
-                for n in range(len(self.field_names)+1, len(fields)+1):
-                    self.field_names.append(default_placeholder % n)
+                line_number += 1
 
     def pop(self, field_name):
         if not self.current_record:
@@ -151,11 +173,16 @@ def main():
     else:
         svg_in = args.svg_file
 
-    f = FileReader(
-        args.csv_file,
-        separator=args.separator,
-        first_line_headers=args.header
-    )
+    try:
+        f = FileReader(
+            args.csv_file,
+            separator=args.separator,
+            first_line_headers=args.header
+        )
+    except SvgsagomaInvalidRecordLength as e:
+        print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
+        return 3
+
     try:
         s = Sagoma(svg_in, f.field_names)
     except SvgsagomaMissingPlaceholders as e:
