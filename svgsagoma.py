@@ -92,6 +92,13 @@ class Sagoma():
             #   ...
             # ]
 
+        if len(self.slices) == 0:
+            raise SvgsagomaMissingPlaceholders(
+                "No placeholder(s) found. Expected: {}".format(
+                    ", ".join(field_names)
+                )
+            )
+
         self.slices.sort(key=lambda t: t[1][0])
         # sorted in order of appareance in the file
 
@@ -149,12 +156,16 @@ def main():
         separator=args.separator,
         first_line_headers=args.header
     )
-    s = Sagoma(svg_in, f.field_names)
+    try:
+        s = Sagoma(svg_in, f.field_names)
+    except SvgsagomaMissingPlaceholders as e:
+        print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
+        return 1
+        
     tmpfile = "_temp.svg"
     out_list = list()
 
     i = 1
-    exit_error = 0
     while not f.is_empty():
 
         out_file = "{}{}.{}".format(
@@ -170,8 +181,10 @@ def main():
                     temp.write(txt)
         except SvgsagomaMissingPlaceholders as e:
             print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
-            exit_error = 1
-            break
+            for f in out_list[:-1]:
+                # remove already created output files
+                os.remove(f)
+            return 2
 
         subprocess.check_output([
             "inkscape",
@@ -183,10 +196,6 @@ def main():
         i+=1
 
     os.remove(tmpfile)
-
-    if exit_error > 0:
-        # TODO: remove created files
-        return exit_error
 
     if args.j:
         # join all generated files in a multipage
