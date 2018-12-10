@@ -162,7 +162,6 @@ def main():
         print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
         return 1
         
-    tmpfile = "_temp.svg"
     out_list = list()
 
     i = 1
@@ -175,13 +174,21 @@ def main():
         )
         out_list.append(out_file)
 
+        tmpfile = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".svg",
+            delete=False
+        )
+
         try:
-            with open(tmpfile, "w") as temp:
-                for txt in s.fill(f.pop):
-                    temp.write(txt)
+            for txt in s.fill(f.pop):
+                tmpfile.write(txt)
+            tmpfile.close()
         except SvgsagomaMissingPlaceholders as e:
             print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
-            os.remove(tmpfile)
+            tmpfile.close()
+            os.remove(tmpfile.name)
             for f in out_list[:-1]:
                 # remove already created output files
                 os.remove(f)
@@ -189,14 +196,14 @@ def main():
 
         subprocess.check_output([
             "inkscape",
-            "-z", tmpfile,
+            "-z", tmpfile.name,
             "-d", str(args.d),
             args.format['flag'], out_file
         ])
 
         i+=1
 
-    os.remove(tmpfile)
+    os.remove(tmpfile.name)
 
     if args.j:
         # join all generated files in a multipage
