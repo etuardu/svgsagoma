@@ -148,6 +148,9 @@ def parse_arguments():
     parser.add_argument("--separator", default=';', help="separator character in the csv file (default: ';')")
     parser.add_argument("--header", action="store_true", help="name the placeholders according to the first line of the csv file (default: 'txt1' ... 'txtN')")
     group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-svg", dest='format', action="store_const",
+                       const=dict(ext='svg', flag=''),
+                       help="export as svg")
     group.add_argument("-png", dest='format', action="store_const",
                        const=dict(ext='png', flag='-e'),
                        help="export as png")
@@ -201,37 +204,42 @@ def main():
         )
         out_list.append(out_file)
 
-        tmpfile = tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            suffix=".svg",
-            delete=False
-        )
+        if (args.format['ext'] == 'svg'):
+          svgoutfile = open(out_file, "w")
+        else:
+          svgoutfile = tempfile.NamedTemporaryFile(
+              mode="w",
+              encoding="utf-8",
+              suffix=".svg",
+              delete=False
+          )
 
         try:
             for txt in s.fill(f.pop):
-                tmpfile.write(txt)
-            tmpfile.close()
+                svgoutfile.write(txt)
+            svgoutfile.close()
         except SvgsagomaMissingPlaceholders as e:
             print("svgsagoma: {}".format(e.args[0]), file=sys.stderr)
-            tmpfile.close()
-            os.remove(tmpfile.name)
+            svgoutfile.close()
+            os.remove(svgoutfile.name)
             for f in out_list[:-1]:
                 # remove already created output files
                 os.remove(f)
             return 2
 
-        subprocess.check_output([
-            "inkscape",
-            f"--export-type={args.format['ext']}",
-            tmpfile.name,
-            "-d", str(args.d),
-            "-o", out_file
-        ])
+        if (args.format['ext'] != 'svg'):
+          subprocess.check_output([
+              "inkscape",
+              f"--export-type={args.format['ext']}",
+              svgoutfile.name,
+              "-d", str(args.d),
+              "-o", out_file
+          ])
 
         i+=1
 
-    os.remove(tmpfile.name)
+    if (args.format['ext'] != 'svg'):
+      os.remove(svgoutfile.name)
 
     if args.j:
         # join all generated files in a multipage
