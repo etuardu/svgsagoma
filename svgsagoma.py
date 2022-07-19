@@ -196,7 +196,7 @@ def main():
 
         out_file = "{}{}.{}".format(
             args.out_prefix,
-            str(i).zfill(3),
+            str(i), #.zfill(3),
             args.format['ext']
         )
         out_list.append(out_file)
@@ -223,9 +223,10 @@ def main():
 
         subprocess.check_output([
             "inkscape",
-            "-z", tmpfile.name,
+            f"--export-type={args.format['ext']}",
+            tmpfile.name,
             "-d", str(args.d),
-            args.format['flag'], out_file
+            "-o", out_file
         ])
 
         i+=1
@@ -260,5 +261,3 @@ def main():
 
 if __name__ == '__main__':
     exit(main())
-
-
