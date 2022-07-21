@@ -24,12 +24,15 @@ class FileReader():
 
     def __init__(self, f, separator=';', first_line_headers=False):
 
+        if (separator == r'\t'):
+          separator = '\t'
+
         self.field_names = list()
         self.records = list()
         self.current_record = None
 
         with open(f) as infile:
-            firstrecord = infile.readline().rstrip().split(separator)
+            firstrecord = infile.readline().rstrip('\r\n ').split(separator)
             line_number = 2
             record_length = len(firstrecord)
 
@@ -44,7 +47,7 @@ class FileReader():
                 line_number = 1
 
             for line in infile:
-                fields = line.rstrip().split(separator)
+                fields = line.rstrip('\r\n ').split(separator)
                 if len(fields) != record_length:
                     raise SvgsagomaInvalidRecordLength(
                         "{} records read, {} expected ({}, line {})".format(
@@ -170,9 +173,12 @@ def main():
         # svg preprocessing
         if args.sed in sed_presets:
             args.sed = sed_presets[args.sed]
-        svg_in = tempfile.TemporaryFile()
-        subprocess.run(['sed', '--posix', args.sed, args.svg_file], stdout=svg_in)
-        svg_in.seek(0)
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as tempsvg:
+          svg_in = tempsvg.name
+          subprocess.run(['sed', '--posix', args.sed, args.svg_file], stdout=tempsvg)
+          #print("sed: ", args.sed, " > ", svg_in)
+
     else:
         svg_in = args.svg_file
 
